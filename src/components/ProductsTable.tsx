@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import Button from "@mui/material/Button";
 import {
   Table,
   TableBody,
@@ -8,15 +13,13 @@ import {
   TableRow,
   Paper,
   IconButton,
-  Collapse,
   Box,
   Typography,
 } from "@mui/material";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
 import Loading from "./Loading";
+import { useProductModal } from "../hooks/useProductModal";
 
 export interface Variation {
   estoque: string;
@@ -35,7 +38,7 @@ export interface Product {
   nome: string | null;
   preco: string | null;
   descricao?: string;
-  variacao: Variation[]; // Corrija aqui para 'variacao'
+  variacao: Variation[];
   categorias: number[];
 }
 
@@ -43,50 +46,134 @@ interface ProdutosTableProps {
   products: Product[];
   favoritos?: Product[];
   onFavoritar?: (product: Product) => void;
-  loading?: boolean; // Adicione esta prop
+  loading?: boolean;
 }
 
 const Row: React.FC<{
   product: Product;
   favoritos: Product[];
   onFavoritar?: (produto: Product) => void;
-}> = ({ product, favoritos, onFavoritar }) => {
-  const [open, setOpen] = useState(false);
+  onClick: (product: Product) => void;
+}> = ({ product, favoritos, onFavoritar, onClick }) => {
+  return (
+    <TableRow
+      hover
+      style={{ cursor: "pointer" }}
+      onClick={() => onClick(product)}
+    >
+      <TableCell>{product.id}</TableCell>
+      <TableCell>{product.nome || "Nome desconhecido"}</TableCell>
+      <TableCell>{product.preco ?? "Preço não disponível"}</TableCell>
+      <TableCell>{product.descricao ?? "-Descrição não disponível"}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
+        {onFavoritar && (
+          <IconButton onClick={() => onFavoritar(product)} color="primary">
+            {favoritos?.some((f) => f.id === product.id) ? (
+              <StarIcon color="warning" />
+            ) : (
+              <StarBorderIcon />
+            )}
+          </IconButton>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+};
+
+const ProdutosTable: React.FC<ProdutosTableProps> = ({
+  products,
+  favoritos = [],
+  onFavoritar,
+  loading = false,
+}) => {
+  const { modalOpen, selectedProduct, openModal, closeModal } =
+    useProductModal();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: 200,
+        }}
+      >
+        <Loading />
+      </Box>
+    );
+  }
 
   return (
     <>
-      <TableRow hover>
-        <TableCell>
-          <IconButton size="small" onClick={() => setOpen(!open)}>
-            {open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-          </IconButton>
-        </TableCell>
-        <TableCell>{product.id}</TableCell>
-        <TableCell>{product.nome || "Nome desconhecido"}</TableCell>
-        <TableCell>{product.preco ?? "Preço não disponível"}</TableCell>
-        <TableCell>
-          {product.descricao ?? "-Descrição não disponível"}
-        </TableCell>
-        <TableCell>
-          {onFavoritar && (
-            <IconButton onClick={() => onFavoritar(product)} color="primary">
-              {favoritos?.some((f) => f.id === product.id) ? (
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
+                ID
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
+                Nome
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
+                Preço
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
+                Descrição
+              </TableCell>
+              <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
+                Favorito
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {products.map((product) => (
+              <Row
+                key={product.id}
+                product={product}
+                favoritos={favoritos}
+                onFavoritar={onFavoritar}
+                onClick={openModal}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Dialog open={modalOpen} onClose={closeModal} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Detalhes do Produto
+          {selectedProduct && onFavoritar && (
+            <IconButton
+              onClick={() => onFavoritar(selectedProduct)}
+              color="primary"
+              sx={{ ml: 2 }}
+            >
+              {favoritos?.some((f) => f.id === selectedProduct.id) ? (
                 <StarIcon color="warning" />
               ) : (
                 <StarBorderIcon />
               )}
             </IconButton>
           )}
-        </TableCell>
-      </TableRow>
-      <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={5}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box margin={1}>
-              <Typography variant="subtitle1" gutterBottom>
-                Variações
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedProduct && (
+            <Box>
+              <Typography variant="h6">{selectedProduct.nome}</Typography>
+              <Typography>ID: {selectedProduct.id}</Typography>
+              <Typography>
+                Preço: {selectedProduct.preco ?? "Preço não disponível"}
               </Typography>
-              <Table size="small">
+              <Typography>
+                Descrição:{" "}
+                {selectedProduct.descricao ?? "-Descrição não disponível"}
+              </Typography>
+              <Typography sx={{ mt: 2, fontWeight: "bold" }}>
+                Variações:
+              </Typography>
+              <Table size="small" sx={{ mt: 1 }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: "bold" }}>Estoque</TableCell>
@@ -103,7 +190,7 @@ const Row: React.FC<{
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {product.variacao.map((v, idx) => (
+                  {selectedProduct.variacao.map((v, idx) => (
                     <TableRow key={idx}>
                       <TableCell>{v.estoque}</TableCell>
                       <TableCell>{v.vendedor}</TableCell>
@@ -121,66 +208,15 @@ const Row: React.FC<{
                 </TableBody>
               </Table>
             </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeModal} color="primary">
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
-  );
-};
-
-const ProdutosTable: React.FC<ProdutosTableProps> = ({
-  products,
-  favoritos = [],
-  onFavoritar,
-  loading = false, // valor padrão
-}) => {
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 200,
-        }}
-      >
-        <Loading />
-      </Box>
-    );
-  }
-
-  return (
-    <TableContainer component={Paper}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell />
-            <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
-              ID
-            </TableCell>
-            <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
-              Nome
-            </TableCell>
-            <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
-              Preço
-            </TableCell>
-            <TableCell sx={{ fontWeight: "bold", fontSize: "16px" }}>
-              Descrição
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {products.map((product) => (
-            <Row
-              key={product.id}
-              product={product}
-              favoritos={favoritos}
-              onFavoritar={onFavoritar}
-            />
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
   );
 };
 
